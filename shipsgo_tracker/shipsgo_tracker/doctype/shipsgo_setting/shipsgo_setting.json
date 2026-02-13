@@ -1,0 +1,74 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-12 19:14:04.057913",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enable",
+  "shipsgo_base_api_url",
+  "shipsgo_dashboard_api_url_copy",
+  "user_access_token"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enable",
+   "fieldtype": "Check",
+   "label": "Enable"
+  },
+  {
+   "fieldname": "shipsgo_base_api_url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "ShipsGo Base API URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "user_access_token",
+   "fieldtype": "Table",
+   "label": "ShipsGo User (Access Token Authentication",
+   "options": "ShipsGo User Access Tokens"
+  },
+  {
+   "fieldname": "shipsgo_dashboard_api_url_copy",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "ShipsGo Dashboard API URL Copy",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-02-13 10:12:29.407941",
+ "modified_by": "Administrator",
+ "module": "Shipsgo Tracker",
+ "name": "ShipsGo Setting",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Support Team",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
