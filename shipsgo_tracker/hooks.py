@@ -19,11 +19,6 @@ app_license = "mit"
 # 		"route": "/shipsgo_tracker",
 # 		"has_permission": "shipsgo_tracker.api.permission.has_app_permission"
 # 	}
-# ]
-
-# Includes in <head>
-# ------------------
-
 # include js, css files in header of desk.html
 # app_include_css = "/assets/shipsgo_tracker/css/shipsgo_tracker.css"
 # app_include_js = "/assets/shipsgo_tracker/js/shipsgo_tracker.js"
@@ -43,7 +38,7 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Project": "public/js/project_override.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -137,34 +132,37 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Project": {
+		"validate": "shipsgo_tracker.shipsgo_tracker.custom_function.project_doc_custom_function.validate_shipment_tracking"
+	}
+	# 	"*": {
+	# 		"on_update": "method",
+	# 		"on_cancel": "method",
+	# 		"on_trash": "method"
+	# 	}
+}
 
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"shipsgo_tracker.tasks.all"
-# 	],
-# 	"daily": [
-# 		"shipsgo_tracker.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"shipsgo_tracker.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"shipsgo_tracker.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"shipsgo_tracker.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	# 	"all": [
+	# 		"shipsgo_tracker.tasks.all"
+	# 	],
+	"daily": [
+		"shipsgo_tracker.shipsgo_tracker.doctype.shipping_carriers.shipping_carriers.fetch_carrier_list"
+	],
+	# 	"hourly": [
+	# 		"shipsgo_tracker.tasks.hourly"
+	# 	],
+	# 	"weekly": [
+	# 		"shipsgo_tracker.tasks.weekly"
+	# 	],
+	# 	"monthly": [
+	# 		"shipsgo_tracker.tasks.monthly"
+	# 	],
+}
 
 # Testing
 # -------
@@ -247,3 +245,6 @@ app_license = "mit"
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+fixtures = [
+	{"doctype": "Custom Field", "filters": [["module", "=", "Shipsgo Tracker"], ["dt", "=", "Project"]]}
+]
