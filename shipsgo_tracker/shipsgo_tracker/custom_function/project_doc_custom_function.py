@@ -12,10 +12,11 @@ def validate_shipment_tracking(doc, method):
 	"""
 
 	track_with = doc.custom_track_with
-	tracking_number = doc.custom_shipsgo_tracking_number
 
 	if not track_with:
 		return
+
+	tracking_number = doc.custom_shipsgo_tracking_number
 
 	if track_with == "Container Number":
 		if not tracking_number:
@@ -152,20 +153,15 @@ def get_access_token(cron=False):
 	if not shipsgo_setting.enable:
 		frappe.throw("ShipsGo Integration is disabled in Settings")
 
-	if not cron:
-		current_user = frappe.session.user
-	else:
-		current_user = "Administrator"
+	current_user = "Administrator" if cron else frappe.session.user
 
-	token_doc = frappe.get_doc(
-		"ShipsGo User Access Tokens", {"parent": shipsgo_setting.name, "user": current_user}
-	)
-
-	if not token_doc.active:
-		frappe.throw("ShipsGo token is not active for this user")
+	token_doc = frappe.get_doc("ShipsGo User Access Tokens", {"user": current_user})
 
 	if not token_doc:
-		frappe.throw(f"No ShipsGo token configured for user {current_user}")
+		frappe.throw(f"ShipsGo token is not configured for user: {current_user}")
+
+	if not token_doc.active:
+		frappe.throw(f"ShipsGo token is not active for user: {current_user}")
 
 	shipsgo_token = token_doc.get_password("access_token")
 

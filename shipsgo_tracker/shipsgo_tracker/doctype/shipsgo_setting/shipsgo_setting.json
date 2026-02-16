@@ -7,8 +7,7 @@
  "field_order": [
   "enable",
   "shipsgo_base_api_url",
-  "shipsgo_dashboard_api_url_copy",
-  "user_access_token"
+  "shipsgo_dashboard_api_url_copy"
  ],
  "fields": [
   {
@@ -25,12 +24,6 @@
    "reqd": 1
   },
   {
-   "fieldname": "user_access_token",
-   "fieldtype": "Table",
-   "label": "ShipsGo User (Access Token Authentication",
-   "options": "ShipsGo User Access Tokens"
-  },
-  {
    "fieldname": "shipsgo_dashboard_api_url_copy",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -42,7 +35,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-13 10:12:29.407941",
+ "modified": "2026-02-16 06:06:17.498451",
  "modified_by": "Administrator",
  "module": "Shipsgo Tracker",
  "name": "ShipsGo Setting",
