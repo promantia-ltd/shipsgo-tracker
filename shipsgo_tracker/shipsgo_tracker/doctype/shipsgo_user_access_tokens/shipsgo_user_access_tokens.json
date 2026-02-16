@@ -11,7 +11,8 @@
  "field_order": [
   "user",
   "access_token",
-  "active"
+  "active",
+  "is_default"
  ],
  "fields": [
   {
@@ -36,6 +37,13 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Active"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Default"
   }
  ],
  "grid_page_length": 50,
