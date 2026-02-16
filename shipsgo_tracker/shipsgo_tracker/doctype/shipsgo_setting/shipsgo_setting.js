@@ -15,6 +15,12 @@ frappe.ui.form.on("ShipsGo Setting", {
 							indicator: "green",
 						});
 					},
+					error: function () {
+						frappe.show_alert({
+							message: __("Carrier sync failed. Check Error Log for details."),
+							indicator: "red",
+						});
+					},
 				});
 			});
 		}

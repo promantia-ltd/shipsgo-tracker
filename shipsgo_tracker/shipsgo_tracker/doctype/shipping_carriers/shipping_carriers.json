@@ -30,7 +30,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Inactive\nActive"
+   "options": "ACTIVE\nPASSIVE"
   }
  ],
  "grid_page_length": 50,
@@ -58,7 +58,10 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "search_fields": "scac_code",
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "carrier_name"
 }
