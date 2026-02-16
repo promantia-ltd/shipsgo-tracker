@@ -1,0 +1,80 @@
+{
+ "_comments": "[{\"comment\": \"Action Failed<br><br>Option <strong>ShipsGo User Token</strong> for field <strong>user_access_tok...\", \"by\": \"Administrator\", \"name\": \"8fgp6dnrj6\"}]",
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-12 19:20:26.264446",
+ "autoname": "field:user",                                                                                                                                                              
+ "naming_rule": "By fieldname",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "access_token",
+  "active"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "unique": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "access_token",
+   "fieldtype": "Password",
+   "in_list_view": 1,
+   "label": "Access Token",
+   "mandatory_depends_on": "eval:doc.user"
+  },
+  {
+   "default": "0",
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-02-16 05:52:08.734596",
+ "modified_by": "Administrator",
+ "module": "Shipsgo Tracker",
+ "name": "ShipsGo User Access Tokens",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Support Team",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
