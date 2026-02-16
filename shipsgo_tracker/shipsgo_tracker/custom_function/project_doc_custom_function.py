@@ -147,22 +147,32 @@ def create_shipment(docname):
 		return {"status": "failed", "error": str(e)}
 
 
-def get_access_token():
+def get_access_token(use_default=False):
 	shipsgo_setting = frappe.get_single("ShipsGo Setting")
 
 	if not shipsgo_setting.enable:
 		frappe.throw("ShipsGo Integration is disabled in Settings")
 
-	default_token = frappe.db.get_value(
-		"ShipsGo User Access Tokens",
-		{"is_default": 1, "active": 1},
-		"name",
-	)
+	if use_default:
+		token_name = frappe.db.get_value(
+			"ShipsGo User Access Tokens",
+			{"is_default": 1, "active": 1},
+			"name",
+		)
+		if not token_name:
+			frappe.throw(
+				"No default active ShipsGo access token found. Please mark one token as 'Is Default'."
+			)
+	else:
+		token_name = frappe.db.get_value(
+			"ShipsGo User Access Tokens",
+			{"user": frappe.session.user, "active": 1},
+			"name",
+		)
+		if not token_name:
+			frappe.throw(f"No active ShipsGo access token found for user: {frappe.session.user}")
 
-	if not default_token:
-		frappe.throw("No default active ShipsGo access token found. Please mark one token as 'Is Default'.")
-
-	token_doc = frappe.get_doc("ShipsGo User Access Tokens", default_token)
+	token_doc = frappe.get_doc("ShipsGo User Access Tokens", token_name)
 	shipsgo_token = token_doc.get_password("access_token")
 
 	base_url = shipsgo_setting.shipsgo_base_api_url

@@ -14,7 +14,7 @@ class ShippingCarriers(Document):
 @frappe.whitelist()
 def fetch_carrier_list():
 	try:
-		token, base_url = get_access_token()
+		token, base_url = get_access_token(use_default=True)
 		url = f"{base_url}/ocean/carriers"
 
 		headers = {"X-Shipsgo-User-Token": token, "Content-Type": "application/json"}
