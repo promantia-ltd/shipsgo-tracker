@@ -33,16 +33,16 @@ def validate_shipment_tracking(doc, method):
 				)
 			)
 
-	elif track_with == "Booking Number":
+	elif track_with == "MBL / Booking Number":
 		if not tracking_number:
-			frappe.throw(_("Booking Number is required when Track With is 'Booking Number'."))
+			frappe.throw(_("MBL / Booking Number is required when Track With is 'MBL / Booking Number'."))
 
-		# ShipsGo booking format: ^[a-zA-Z0-9/-]+$
+		# ShipsGo MBL/booking format: ^[a-zA-Z0-9/-]+$
 		pattern = r"^[a-zA-Z0-9/-]+$"
 
 		if not re.match(pattern, tracking_number):
 			frappe.throw(
-				_("Invalid Booking Number format.<br>" "Only letters, numbers, / and - are allowed.")
+				_("Invalid MBL / Booking Number format.<br>" "Only letters, numbers, / and - are allowed.")
 			)
 
 
@@ -64,7 +64,7 @@ def create_shipment(docname):
 
 	if doc.custom_track_with == "Container Number":
 		payload["container_number"] = doc.custom_shipsgo_tracking_number
-	elif doc.custom_track_with == "Booking Number":
+	elif doc.custom_track_with == "MBL / Booking Number":
 		payload["booking_number"] = doc.custom_shipsgo_tracking_number
 
 	headers = {"Content-Type": "application/json", "X-Shipsgo-User-Token": shipsgo_token}
@@ -147,22 +147,22 @@ def create_shipment(docname):
 		return {"status": "failed", "error": str(e)}
 
 
-def get_access_token(cron=False):
+def get_access_token():
 	shipsgo_setting = frappe.get_single("ShipsGo Setting")
 
 	if not shipsgo_setting.enable:
 		frappe.throw("ShipsGo Integration is disabled in Settings")
 
-	current_user = "Administrator" if cron else frappe.session.user
+	default_token = frappe.db.get_value(
+		"ShipsGo User Access Tokens",
+		{"is_default": 1, "active": 1},
+		"name",
+	)
 
-	token_doc = frappe.get_doc("ShipsGo User Access Tokens", current_user)
+	if not default_token:
+		frappe.throw("No default active ShipsGo access token found. Please mark one token as 'Is Default'.")
 
-	if not token_doc:
-		frappe.throw(f"ShipsGo token is not configured for user: {current_user}")
-
-	if not token_doc.active:
-		frappe.throw(f"ShipsGo token is not active for user: {current_user}")
-
+	token_doc = frappe.get_doc("ShipsGo User Access Tokens", default_token)
 	shipsgo_token = token_doc.get_password("access_token")
 
 	base_url = shipsgo_setting.shipsgo_base_api_url
