@@ -39,11 +39,19 @@ def fetch_carrier_list():
 					if not scac:
 						continue
 
-					if not frappe.db.exists("Shipping Carriers", {"scac_code": scac}):
+					if frappe.db.exists("Shipping Carriers", {"scac_code": scac}):
+						# Update existing — carrier name or status may have changed
+						doc = frappe.get_doc("Shipping Carriers", scac)
+						if doc.carrier_name != name or doc.status != status:
+							doc.carrier_name = name
+							doc.status = status
+							doc.save(ignore_permissions=True)
+					else:
+						# Insert new
 						doc = frappe.new_doc("Shipping Carriers")
 						doc.carrier_name = name
 						doc.scac_code = scac
-						doc.status = "Active" if status == "ACTIVE" else "Inactive"
+						doc.status = status
 						doc.insert(ignore_permissions=True)
 
 				frappe.db.commit()

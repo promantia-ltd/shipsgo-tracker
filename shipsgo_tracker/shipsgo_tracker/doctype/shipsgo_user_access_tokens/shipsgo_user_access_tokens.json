@@ -3,6 +3,8 @@
  "actions": [],
  "allow_rename": 1,
  "creation": "2026-02-12 19:20:26.264446",
+ "autoname": "field:user",                                                                                                                                                              
+ "naming_rule": "By fieldname",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -17,7 +19,9 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "User",
-   "options": "User"
+   "options": "User",
+   "unique": 1,
+   "reqd": 1
   },
   {
    "fieldname": "access_token",
