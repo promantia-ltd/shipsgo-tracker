@@ -11,6 +11,9 @@ def validate_shipment_tracking(doc, method):
 	Validate shipment tracking fields based on Track With selection
 	"""
 
+	if not doc.custom_carrier_code:
+		frappe.throw(_("Carrier Code is required."))
+
 	track_with = doc.custom_track_with
 
 	if not track_with:
@@ -33,16 +36,16 @@ def validate_shipment_tracking(doc, method):
 				)
 			)
 
-	elif track_with == "Booking Number":
+	elif track_with == "MBL / Booking Number":
 		if not tracking_number:
-			frappe.throw(_("Booking Number is required when Track With is 'Booking Number'."))
+			frappe.throw(_("MBL / Booking Number is required when Track With is 'MBL / Booking Number'."))
 
 		# ShipsGo booking format: ^[a-zA-Z0-9/-]+$
 		pattern = r"^[a-zA-Z0-9/-]+$"
 
 		if not re.match(pattern, tracking_number):
 			frappe.throw(
-				_("Invalid Booking Number format.<br>" "Only letters, numbers, / and - are allowed.")
+				_("Invalid MBL / Booking Number format.<br>" "Only letters, numbers, / and - are allowed.")
 			)
 
 
@@ -59,12 +62,12 @@ def create_shipment(docname):
 
 	payload = {
 		"reference": doc.name,
-		"carrier": doc.custom_carrier,
+		"carrier": doc.custom_carrier_code,
 	}
 
 	if doc.custom_track_with == "Container Number":
 		payload["container_number"] = doc.custom_shipsgo_tracking_number
-	elif doc.custom_track_with == "Booking Number":
+	elif doc.custom_track_with == "MBL / Booking Number":
 		payload["booking_number"] = doc.custom_shipsgo_tracking_number
 
 	headers = {"Content-Type": "application/json", "X-Shipsgo-User-Token": shipsgo_token}
@@ -147,17 +150,23 @@ def create_shipment(docname):
 		return {"status": "failed", "error": str(e)}
 
 
-def get_access_token(cron=False):
+def get_access_token(fetch_call=False):
 	shipsgo_setting = frappe.get_single("ShipsGo Setting")
 
 	if not shipsgo_setting.enable:
 		frappe.throw("ShipsGo Integration is disabled in Settings")
 
-	current_user = "Administrator" if cron else frappe.session.user
+	if fetch_call:
+		current_user = frappe.db.get_value("ShipsGo User Access Tokens", {"default": 1}, "name")
+
+		if not current_user:
+			frappe.throw("No default access token user is configured.")
+	else:
+		current_user = frappe.session.user
 
 	token_doc = frappe.get_doc("ShipsGo User Access Tokens", current_user)
 
-	if not token_doc:
+	if not token_doc or not token_doc.access_token:
 		frappe.throw(f"ShipsGo token is not configured for user: {current_user}")
 
 	if not token_doc.active:

@@ -14,7 +14,7 @@ class ShippingCarriers(Document):
 @frappe.whitelist()
 def fetch_carrier_list():
 	try:
-		token, base_url = get_access_token(cron=True)
+		token, base_url = get_access_token(fetch_call=True)
 		url = f"{base_url}/ocean/carriers"
 
 		if not token:

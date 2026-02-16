@@ -1,17 +1,16 @@
 {
- "_comments": "[{\"comment\": \"Action Failed<br><br>Option <strong>ShipsGo User Token</strong> for field <strong>user_access_tok...\", \"by\": \"Administrator\", \"name\": \"8fgp6dnrj6\"}]",
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:user",
  "creation": "2026-02-12 19:20:26.264446",
- "autoname": "field:user",                                                                                                                                                              
- "naming_rule": "By fieldname",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
   "user",
   "access_token",
-  "active"
+  "active",
+  "default"
  ],
  "fields": [
   {
@@ -20,8 +19,8 @@
    "in_list_view": 1,
    "label": "User",
    "options": "User",
-   "unique": 1,
-   "reqd": 1
+   "reqd": 1,
+   "unique": 1
   },
   {
    "fieldname": "access_token",
@@ -36,15 +35,22 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Active"
+  },
+  {
+   "default": "0",
+   "fieldname": "default",
+   "fieldtype": "Check",
+   "label": "Default"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-16 05:52:08.734596",
+ "modified": "2026-02-16 11:06:34.539543",
  "modified_by": "Administrator",
  "module": "Shipsgo Tracker",
  "name": "ShipsGo User Access Tokens",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
