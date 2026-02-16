@@ -14,12 +14,8 @@ class ShippingCarriers(Document):
 @frappe.whitelist()
 def fetch_carrier_list():
 	try:
-		token, base_url = get_access_token(cron=True)
+		token, base_url = get_access_token(use_default=True)
 		url = f"{base_url}/ocean/carriers"
-
-		if not token:
-			frappe.log_error(title="ShipsGo Token Missing", message="ShipsGo token not configured")
-			return
 
 		headers = {"X-Shipsgo-User-Token": token, "Content-Type": "application/json"}
 
