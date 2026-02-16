@@ -32,7 +32,6 @@ def fetch_carrier_list():
 				carriers = data.get("carriers", [])
 
 				for carrier in carriers:
-					new_carriers_added = False
 					scac = carrier.get("scac")
 					name = carrier.get("name")
 					status = carrier.get("status")
@@ -46,10 +45,8 @@ def fetch_carrier_list():
 						doc.scac_code = scac
 						doc.status = "Active" if status == "ACTIVE" else "Inactive"
 						doc.insert(ignore_permissions=True)
-						new_carriers_added = True
 
-					if new_carriers_added:
-						frappe.db.commit()
+				frappe.db.commit()
 
 			else:
 				frappe.log_error(title="ShipsGo Logical Failure", message=frappe.as_json(data))

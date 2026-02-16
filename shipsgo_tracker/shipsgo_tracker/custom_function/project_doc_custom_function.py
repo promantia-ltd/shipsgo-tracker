@@ -155,7 +155,7 @@ def get_access_token(cron=False):
 
 	current_user = "Administrator" if cron else frappe.session.user
 
-	token_doc = frappe.get_doc("ShipsGo User Access Tokens", {"user": current_user})
+	token_doc = frappe.get_doc("ShipsGo User Access Tokens", current_user)
 
 	if not token_doc:
 		frappe.throw(f"ShipsGo token is not configured for user: {current_user}")
