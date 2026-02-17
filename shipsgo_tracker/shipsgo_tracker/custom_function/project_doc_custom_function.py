@@ -134,9 +134,11 @@ def create_shipment(docname):
 			return {"status": "failed", "error": response.text}
 
 	except requests.exceptions.Timeout:
+		frappe.log_error(title="ShipsGo Shipment Timeout", message=f"Timeout while creating shipment for {docname}")
 		return {"status": "retryable", "error": "Request timed out. Please try again."}
 
 	except requests.exceptions.ConnectionError:
+		frappe.log_error(title="ShipsGo Shipment Connection Error", message=f"Connection failed while creating shipment for {docname}")
 		return {"status": "retryable", "error": "Unable to connect to ShipsGo."}
 
 	except Exception as e:

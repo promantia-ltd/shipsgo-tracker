@@ -94,6 +94,8 @@ function add_custom_buttons(frm) {
 										),
 									indicator: "red",
 								});
+
+								frm.reload_doc();
 							}
 						},
 					});
