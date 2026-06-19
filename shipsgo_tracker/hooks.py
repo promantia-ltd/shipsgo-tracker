@@ -147,21 +147,15 @@ doc_events = {
 # ---------------
 
 scheduler_events = {
-	# 	"all": [
-	# 		"shipsgo_tracker.tasks.all"
-	# 	],
 	"daily": [
 		"shipsgo_tracker.shipsgo_tracker.doctype.shipping_carriers.shipping_carriers.fetch_carrier_list"
 	],
-	# 	"hourly": [
-	# 		"shipsgo_tracker.tasks.hourly"
-	# 	],
-	# 	"weekly": [
-	# 		"shipsgo_tracker.tasks.weekly"
-	# 	],
-	# 	"monthly": [
-	# 		"shipsgo_tracker.tasks.monthly"
-	# 	],
+	"cron": {
+		# ~3x per day, matching ShipsGo's update cadence
+		"0 */8 * * *": [
+			"shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.refresh_active_shipments"
+		]
+	},
 }
 
 # Testing
