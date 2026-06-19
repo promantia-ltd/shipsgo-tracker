@@ -125,8 +125,11 @@ class TestRefreshActive(FrappeTestCase):
             tok.is_default = 1
             tok.insert(ignore_permissions=True)
         else:
-            frappe.db.set_value("ShipsGo User Access Tokens", "Administrator",
-                                {"active": 1, "is_default": 1})
+            doc = frappe.get_doc("ShipsGo User Access Tokens", "Administrator")
+            doc.active = 1
+            doc.is_default = 1
+            doc.access_token = "secret-token"
+            doc.save(ignore_permissions=True)
 
         self.project = frappe.new_doc("Project")
         self.project.project_name = "SHIPSGO-TEST-PULLBACK"
@@ -186,9 +189,11 @@ class TestRefreshActive(FrappeTestCase):
                    "shipments": [{"id": 555001, "status": "INPROGRESS", "route": None}],
                    "meta": {"more": False}}
         with patch.object(sr.requests, "get", return_value=_resp(200, payload)):
-            sr.refresh_active_shipments()
+            result = sr.refresh_active_shipments()
         self.assertEqual(
             frappe.db.get_value("Project", self.project.name, "custom_shipsgo_live_status"),
             "INPROGRESS")
         self.assertIsNotNone(
             frappe.db.get_value("Project", self.project.name, "custom_shipsgo_eta"))
+        self.assertEqual(result["updated"], 1)
+        self.assertTrue(result["ok"])
