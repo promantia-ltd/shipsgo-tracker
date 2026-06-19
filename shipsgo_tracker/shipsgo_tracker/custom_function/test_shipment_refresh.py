@@ -107,3 +107,88 @@ class TestFetchShipments(FrappeTestCase):
             shipments, ok = sr._fetch_shipments("https://api/v2", "tok", None)
         self.assertFalse(ok)
         self.assertEqual(shipments, [])
+
+
+class TestRefreshActive(FrappeTestCase):
+    def setUp(self):
+        setting = frappe.get_single("ShipsGo Setting")
+        setting.enable = 1
+        setting.shipsgo_base_api_url = "https://api.test/v2"
+        setting.last_shipment_sync_at = None
+        setting.save(ignore_permissions=True)
+
+        if not frappe.db.exists("ShipsGo User Access Tokens", "Administrator"):
+            tok = frappe.new_doc("ShipsGo User Access Tokens")
+            tok.user = "Administrator"
+            tok.access_token = "secret-token"
+            tok.active = 1
+            tok.is_default = 1
+            tok.insert(ignore_permissions=True)
+        else:
+            frappe.db.set_value("ShipsGo User Access Tokens", "Administrator",
+                                {"active": 1, "is_default": 1})
+
+        self.project = frappe.new_doc("Project")
+        self.project.project_name = "SHIPSGO-TEST-PULLBACK"
+        self.project.custom_shipsgo_shipment_id = "555001"
+        self.project.project_owner = "Administrator"
+        self.project.expected_start_date = "2025-01-01"
+        self.project.company = frappe.defaults.get_global_default("company")
+        self.project.insert(ignore_permissions=True)
+
+    def tearDown(self):
+        if frappe.db.exists("Project", self.project.name):
+            frappe.delete_doc("Project", self.project.name, ignore_permissions=True, force=True)
+
+    def test_updates_matching_project(self):
+        payload = {
+            "message": "SUCCESS",
+            "shipments": [{
+                "id": 555001, "status": "SAILING",
+                "route": {
+                    "port_of_loading": {"date_of_loading": "2025-03-10T12:00:00+03:00"},
+                    "port_of_discharge": {"date_of_discharge": "2025-03-18T12:00:00+02:00"},
+                },
+            }],
+            "meta": {"more": False},
+        }
+        with patch.object(sr.requests, "get", return_value=_resp(200, payload)):
+            result = sr.refresh_active_shipments()
+        self.assertEqual(result["updated"], 1)
+        self.assertEqual(
+            frappe.db.get_value("Project", self.project.name, "custom_shipsgo_live_status"),
+            "SAILING",
+        )
+        self.assertIsNotNone(
+            frappe.db.get_value("Project", self.project.name, "custom_shipsgo_eta")
+        )
+        self.assertIsNotNone(frappe.get_single("ShipsGo Setting").last_shipment_sync_at)
+
+    def test_recoverable_error_does_not_advance_window(self):
+        with patch.object(sr.requests, "get", return_value=_resp(429, {})):
+            result = sr.refresh_active_shipments()
+        self.assertFalse(result["ok"])
+        self.assertIsNone(frappe.get_single("ShipsGo Setting").last_shipment_sync_at)
+
+    def test_disabled_integration_skips(self):
+        setting = frappe.get_single("ShipsGo Setting")
+        setting.enable = 0
+        setting.save(ignore_permissions=True)
+        result = sr.refresh_active_shipments()
+        self.assertEqual(result["updated"], 0)
+        self.assertTrue(result["ok"])
+
+    def test_route_null_updates_status_only(self):
+        # pre-seed an ETA so we can prove route-null does NOT overwrite it
+        frappe.db.set_value("Project", self.project.name, "custom_shipsgo_eta",
+                            "2025-01-01 00:00:00", update_modified=False)
+        payload = {"message": "SUCCESS",
+                   "shipments": [{"id": 555001, "status": "INPROGRESS", "route": None}],
+                   "meta": {"more": False}}
+        with patch.object(sr.requests, "get", return_value=_resp(200, payload)):
+            sr.refresh_active_shipments()
+        self.assertEqual(
+            frappe.db.get_value("Project", self.project.name, "custom_shipsgo_live_status"),
+            "INPROGRESS")
+        self.assertIsNotNone(
+            frappe.db.get_value("Project", self.project.name, "custom_shipsgo_eta"))
