@@ -78,22 +78,32 @@ class TestFetchShipments(FrappeTestCase):
         with patch.object(sr.requests, "get", return_value=_resp(200, payload)) as g:
             sr._fetch_shipments("https://api/v2", "tok", "2025-01-01 00:00:00")
         self.assertIn("filters[updated_at]", g.call_args.kwargs["params"])
+        self.assertEqual(g.call_args.kwargs["params"]["filters[updated_at]"], "gte:2025-01-01 00:00:00")
 
     def test_two_pages(self):
         page1 = {"message": "SUCCESS", "shipments": [{"id": i} for i in range(100)], "meta": {"more": True}}
         page2 = {"message": "SUCCESS", "shipments": [{"id": 100}], "meta": {"more": False}}
-        with patch.object(sr.requests, "get", side_effect=[_resp(200, page1), _resp(200, page2)]):
+        with patch.object(sr.requests, "get", side_effect=[_resp(200, page1), _resp(200, page2)]) as g:
             shipments, ok = sr._fetch_shipments("https://api/v2", "tok", "2025-01-01 00:00:00")
         self.assertTrue(ok)
         self.assertEqual(len(shipments), 101)
+        self.assertEqual(g.call_args_list[1].kwargs["params"]["skip"], sr.PAGE_SIZE)
 
     def test_429_is_recoverable(self):
-        with patch.object(sr.requests, "get", return_value=_resp(429, {})):
+        with patch.object(sr.requests, "get", return_value=_resp(429, {})) as g:
             shipments, ok = sr._fetch_shipments("https://api/v2", "tok", None)
         self.assertFalse(ok)
         self.assertEqual(shipments, [])
+        self.assertEqual(g.call_count, 1)
 
     def test_timeout_is_recoverable(self):
         with patch.object(sr.requests, "get", side_effect=sr.Timeout()):
             shipments, ok = sr._fetch_shipments("https://api/v2", "tok", None)
         self.assertFalse(ok)
+        self.assertEqual(shipments, [])
+
+    def test_connection_error_is_recoverable(self):
+        with patch.object(sr.requests, "get", side_effect=sr.ConnectionError()):
+            shipments, ok = sr._fetch_shipments("https://api/v2", "tok", None)
+        self.assertFalse(ok)
+        self.assertEqual(shipments, [])
