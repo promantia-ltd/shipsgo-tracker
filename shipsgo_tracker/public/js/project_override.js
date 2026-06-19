@@ -34,13 +34,12 @@ function add_custom_buttons(frm) {
 	if (
 		frm.doc.custom_carrier &&
 		frm.doc.custom_track_with &&
-		frm.doc.custom_shipsgo_tracking_number
+		frm.doc.custom_shipsgo_tracking_number &&
+		!(frm.doc.custom_shipment_status === "Created" && frm.doc.custom_shipsgo_shipment_id)
 	) {
 		let label = "Create Shipment";
 
-		if (frm.doc.custom_shipment_status === "Created" && frm.doc.custom_shipsgo_shipment_id) {
-			return;
-		} else if (frm.doc.custom_shipment_status === "Failed") {
+		if (frm.doc.custom_shipment_status === "Failed") {
 			label = "Retry Shipment";
 		} else if (frm.doc.custom_shipment_status === "Not Created") {
 			label = "Create Shipment";
@@ -99,6 +98,45 @@ function add_custom_buttons(frm) {
 							}
 						},
 					});
+				});
+			},
+			__("Actions")
+		);
+	}
+
+	if (frm.doc.custom_shipsgo_shipment_id) {
+		frm.add_custom_button(
+			__("Refresh Tracking"),
+			function () {
+				frappe.call({
+					method: "shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.refresh_single_shipment",
+					args: { docname: frm.doc.name },
+					freeze: true,
+					freeze_message: __("Refreshing shipment tracking from ShipsGo..."),
+					callback: function (r) {
+						const res = r.message || {};
+						if (res.status === "success") {
+							frappe.show_alert({
+								message: __("Tracking updated."),
+								indicator: "green",
+							});
+							frm.reload_doc();
+						} else if (res.status === "retryable") {
+							frappe.msgprint({
+								title: __("Temporary Issue"),
+								message: res.error,
+								indicator: "orange",
+							});
+						} else {
+							frappe.msgprint({
+								title: __("Not Updated"),
+								message:
+									res.error ||
+									__("Could not refresh tracking for this shipment."),
+								indicator: "red",
+							});
+						}
+					},
 				});
 			},
 			__("Actions")
