@@ -49,3 +49,37 @@ def map_shipment_fields(shipment):
         if eta:
             updates["custom_shipsgo_eta"] = eta
     return updates
+
+
+def _fetch_shipments(base_url, token, updated_since):
+    """Return (shipments, ok). ok=False means a recoverable error occurred
+    (429 / network / non-200 / non-SUCCESS), so the caller should not advance
+    the sync window. Omits the updated_at filter on the first run (updated_since
+    is falsy) to fully back-fill existing shipments."""
+    headers = {"X-Shipsgo-User-Token": token, "Content-Type": "application/json"}
+    shipments = []
+    skip = 0
+    for _page in range(PAGE_LIMIT):
+        params = {"take": PAGE_SIZE, "skip": skip, "order_by": "updated_at,desc"}
+        if updated_since:
+            params["filters[updated_at]"] = f"gte:{updated_since}"
+        try:
+            resp = requests.get(f"{base_url}{OCEAN_LIST_PATH}", headers=headers, params=params, timeout=30)
+        except (Timeout, ConnectionError):
+            return shipments, False
+        if resp.status_code == 429:
+            return shipments, False
+        if resp.status_code != 200:
+            frappe.log_error(title=f"ShipsGo list HTTP {resp.status_code}", message=resp.text)
+            return shipments, False
+        data = resp.json()
+        if data.get("message") != "SUCCESS":
+            frappe.log_error(title="ShipsGo list logical failure", message=frappe.as_json(data))
+            return shipments, False
+        batch = data.get("shipments", [])
+        shipments.extend(batch)
+        meta = data.get("meta") or {}
+        if not meta.get("more") or len(batch) < PAGE_SIZE:
+            break
+        skip += PAGE_SIZE
+    return shipments, True
