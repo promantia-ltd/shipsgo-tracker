@@ -197,3 +197,51 @@ class TestRefreshActive(FrappeTestCase):
             frappe.db.get_value("Project", self.project.name, "custom_shipsgo_eta"))
         self.assertEqual(result["updated"], 1)
         self.assertTrue(result["ok"])
+
+
+class TestRefreshSingle(FrappeTestCase):
+    def setUp(self):
+        setting = frappe.get_single("ShipsGo Setting")
+        setting.enable = 1
+        setting.shipsgo_base_api_url = "https://api.test/v2"
+        setting.save(ignore_permissions=True)
+        if not frappe.db.exists("ShipsGo User Access Tokens", "Administrator"):
+            tok = frappe.new_doc("ShipsGo User Access Tokens")
+            tok.user = "Administrator"
+            tok.access_token = "secret-token"
+            tok.active = 1
+            tok.is_default = 1
+            tok.insert(ignore_permissions=True)
+        else:
+            doc = frappe.get_doc("ShipsGo User Access Tokens", "Administrator")
+            doc.active = 1
+            doc.is_default = 1
+            doc.access_token = "secret-token"
+            doc.save(ignore_permissions=True)
+        self.project = frappe.new_doc("Project")
+        self.project.project_name = "SHIPSGO-TEST-SINGLE"
+        self.project.custom_shipsgo_shipment_id = "777001"
+        self.project.project_owner = "Administrator"
+        self.project.expected_start_date = "2025-01-01"
+        self.project.company = frappe.defaults.get_global_default("company")
+        self.project.insert(ignore_permissions=True)
+
+    def tearDown(self):
+        if frappe.db.exists("Project", self.project.name):
+            frappe.delete_doc("Project", self.project.name, ignore_permissions=True, force=True)
+
+    def test_success_updates_project(self):
+        payload = {"message": "SUCCESS", "shipments": [{"id": 777001, "status": "ARRIVED",
+            "route": {"port_of_loading": {"date_of_loading": "2025-03-10T12:00:00+03:00"},
+                      "port_of_discharge": {"date_of_discharge": "2025-03-18T12:00:00+02:00"}}}]}
+        with patch.object(sr.requests, "get", return_value=_resp(200, payload)) as g:
+            result = sr.refresh_single_shipment(self.project.name)
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(g.call_args.kwargs["params"]["filters[id]"], "eq:777001")
+        self.assertEqual(
+            frappe.db.get_value("Project", self.project.name, "custom_shipsgo_live_status"), "ARRIVED")
+
+    def test_not_found_when_empty(self):
+        with patch.object(sr.requests, "get", return_value=_resp(200, {"message": "SUCCESS", "shipments": []})):
+            result = sr.refresh_single_shipment(self.project.name)
+        self.assertEqual(result["status"], "not_found")

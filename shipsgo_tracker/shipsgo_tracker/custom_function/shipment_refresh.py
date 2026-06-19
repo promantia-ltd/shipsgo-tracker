@@ -128,3 +128,39 @@ def refresh_active_shipments():
         frappe.db.set_single_value("ShipsGo Setting", "last_shipment_sync_at", run_started)
     frappe.db.commit()
     return {"updated": updated, "ok": ok}
+
+
+@frappe.whitelist()
+def refresh_single_shipment(docname):
+    """Manual 'Refresh Tracking' button. Reads one shipment via the default token
+    using filters[id]. Uses the default token (not the session user's) because the
+    default Administrator token has org-wide read visibility and most users have no
+    token of their own — see spec section 7.5."""
+    # get_access_token(use_default=True) throws a clear message if disabled / no default token.
+    token, base_url = get_access_token(use_default=True)
+
+    shipment_id = frappe.db.get_value("Project", docname, "custom_shipsgo_shipment_id")
+    if not shipment_id:
+        frappe.throw(_("No ShipsGo shipment is linked to this project."))
+
+    headers = {"X-Shipsgo-User-Token": token, "Content-Type": "application/json"}
+    params = {"filters[id]": f"eq:{shipment_id}", "take": 1}
+    try:
+        resp = requests.get(f"{base_url}{OCEAN_LIST_PATH}", headers=headers, params=params, timeout=30)
+    except (Timeout, ConnectionError):
+        return {"status": "retryable", "error": "Network error contacting ShipsGo."}
+    if resp.status_code == 429:
+        return {"status": "retryable", "error": "Too many requests. Please try again shortly."}
+    if resp.status_code != 200:
+        frappe.log_error(title=f"ShipsGo single HTTP {resp.status_code}", message=resp.text)
+        return {"status": "retryable", "error": "ShipsGo returned an unexpected response."}
+    payload = resp.json()
+    shipments = payload.get("shipments") or []
+    if payload.get("message") != "SUCCESS" or not shipments:
+        return {"status": "not_found", "error": "Shipment not visible to the ShipsGo token."}
+
+    shipment = shipments[0]
+    for field, value in map_shipment_fields(shipment).items():
+        frappe.db.set_value("Project", docname, field, value, update_modified=False)
+    frappe.db.commit()
+    return {"status": "success", "live_status": shipment.get("status")}
