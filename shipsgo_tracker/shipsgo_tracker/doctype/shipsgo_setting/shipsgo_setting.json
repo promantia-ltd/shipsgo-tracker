@@ -7,7 +7,8 @@
  "field_order": [
   "enable",
   "shipsgo_base_api_url",
-  "shipsgo_dashboard_api_url_copy"
+  "shipsgo_dashboard_api_url_copy",
+  "last_shipment_sync_at"
  ],
  "fields": [
   {
@@ -29,6 +30,14 @@
    "in_list_view": 1,
    "label": "ShipsGo Dashboard API URL Copy",
    "reqd": 1
+  },
+  {
+   "fieldname": "last_shipment_sync_at",
+   "fieldtype": "Datetime",
+   "label": "Last Shipment Sync At",
+   "read_only": 1,
+   "hidden": 1,
+   "no_copy": 1
   }
  ],
  "grid_page_length": 50,
