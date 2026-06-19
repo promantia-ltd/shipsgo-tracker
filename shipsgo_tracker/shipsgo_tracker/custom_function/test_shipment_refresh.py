@@ -111,6 +111,13 @@ class TestFetchShipments(FrappeTestCase):
 
 class TestRefreshActive(FrappeTestCase):
     def setUp(self):
+        if frappe.db.exists("Project", {"project_name": "SHIPSGO-TEST-PULLBACK"}):
+            frappe.delete_doc(
+                "Project",
+                frappe.db.get_value("Project", {"project_name": "SHIPSGO-TEST-PULLBACK"}),
+                ignore_permissions=True, force=True,
+            )
+
         setting = frappe.get_single("ShipsGo Setting")
         setting.enable = 1
         setting.shipsgo_base_api_url = "https://api.test/v2"
@@ -201,6 +208,13 @@ class TestRefreshActive(FrappeTestCase):
 
 class TestRefreshSingle(FrappeTestCase):
     def setUp(self):
+        if frappe.db.exists("Project", {"project_name": "SHIPSGO-TEST-SINGLE"}):
+            frappe.delete_doc(
+                "Project",
+                frappe.db.get_value("Project", {"project_name": "SHIPSGO-TEST-SINGLE"}),
+                ignore_permissions=True, force=True,
+            )
+
         setting = frappe.get_single("ShipsGo Setting")
         setting.enable = 1
         setting.shipsgo_base_api_url = "https://api.test/v2"
@@ -243,5 +257,11 @@ class TestRefreshSingle(FrappeTestCase):
 
     def test_not_found_when_empty(self):
         with patch.object(sr.requests, "get", return_value=_resp(200, {"message": "SUCCESS", "shipments": []})):
+            result = sr.refresh_single_shipment(self.project.name)
+        self.assertEqual(result["status"], "not_found")
+
+    def test_not_found_on_failure_message(self):
+        payload = {"message": "FAILURE", "shipments": [{"id": 777001, "status": "ARRIVED"}]}
+        with patch.object(sr.requests, "get", return_value=_resp(200, payload)):
             result = sr.refresh_single_shipment(self.project.name)
         self.assertEqual(result["status"], "not_found")
