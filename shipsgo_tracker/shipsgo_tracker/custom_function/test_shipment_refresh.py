@@ -49,6 +49,26 @@ class TestShipmentMapping(FrappeTestCase):
         self.assertNotIn("custom_shipsgo_etd", updates)
         self.assertNotIn("custom_shipsgo_eta", updates)
 
+    def test_to_utc_filter_value_converts_and_margins(self):
+        # 2025-06-15 12:00 EDT (UTC-4); minus 1h margin = 11:00 EDT = 15:00 UTC
+        with patch(
+            "shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.get_system_timezone",
+            return_value="America/New_York",
+        ):
+            out = sr._to_utc_filter_value("2025-06-15 12:00:00")
+        self.assertEqual(out, "2025-06-15 15:00:00")
+
+    def test_to_utc_filter_value_utc_site(self):
+        with patch(
+            "shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.get_system_timezone",
+            return_value="UTC",
+        ):
+            out = sr._to_utc_filter_value("2025-06-15 12:00:00")
+        self.assertEqual(out, "2025-06-15 11:00:00")
+
+    def test_to_utc_filter_value_none(self):
+        self.assertIsNone(sr._to_utc_filter_value(None))
+
 
 def _resp(status_code=200, payload=None):
     m = MagicMock()
@@ -204,6 +224,26 @@ class TestRefreshActive(FrappeTestCase):
             frappe.db.get_value("Project", self.project.name, "custom_shipsgo_eta"))
         self.assertEqual(result["updated"], 1)
         self.assertTrue(result["ok"])
+
+    def test_windowed_filter_is_utc_converted(self):
+        """Proves that last_shipment_sync_at is UTC-converted before being sent as
+        the filters[updated_at] param. We pin get_system_timezone to 'UTC' so the
+        expected value is deterministic: 2025-01-01 11:00:00 (minus 1h margin from noon)."""
+        setting = frappe.get_single("ShipsGo Setting")
+        setting.last_shipment_sync_at = "2025-01-01 12:00:00"
+        setting.save(ignore_permissions=True)
+
+        payload = {"message": "SUCCESS", "shipments": [], "meta": {"more": False}}
+        with patch(
+            "shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.get_system_timezone",
+            return_value="UTC",
+        ):
+            with patch.object(sr.requests, "get", return_value=_resp(200, payload)) as g:
+                sr.refresh_active_shipments()
+
+        sent_params = g.call_args.kwargs["params"]
+        self.assertIn("filters[updated_at]", sent_params)
+        self.assertEqual(sent_params["filters[updated_at]"], "gte:2025-01-01 11:00:00")
 
 
 class TestRefreshSingle(FrappeTestCase):

@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 import frappe
 import requests
 from frappe import _
-from frappe.utils import get_system_timezone, now_datetime
+from frappe.utils import get_datetime, get_system_timezone, now_datetime
 from requests.exceptions import ConnectionError, Timeout
 
 from shipsgo_tracker.shipsgo_tracker.custom_function.project_doc_custom_function import (
@@ -27,6 +27,18 @@ def _to_system_datetime(value):
         return dt
     system_tz = ZoneInfo(get_system_timezone())
     return dt.astimezone(system_tz).replace(tzinfo=None)
+
+
+def _to_utc_filter_value(value, margin_hours=1):
+    """Convert a naive system-timezone datetime (e.g. last_shipment_sync_at) to a
+    UTC 'YYYY-MM-DD HH:MM:SS' string for ShipsGo's filters[updated_at] (which is UTC),
+    minus an overlap margin so a transition landing on the boundary is never missed."""
+    if not value:
+        return None
+    dt = get_datetime(value) - datetime.timedelta(hours=margin_hours)
+    system_tz = ZoneInfo(get_system_timezone())
+    dt_utc = dt.replace(tzinfo=system_tz).astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+    return dt_utc.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def map_shipment_fields(shipment):
@@ -82,6 +94,11 @@ def _fetch_shipments(base_url, token, updated_since):
         if not meta.get("more") or len(batch) < PAGE_SIZE:
             break
         skip += PAGE_SIZE
+    else:
+        frappe.log_error(
+            title="ShipsGo pagination hit PAGE_LIMIT",
+            message=f"Stopped after {PAGE_LIMIT} pages; results may be truncated.",
+        )
     return shipments, True
 
 
@@ -108,7 +125,7 @@ def refresh_active_shipments():
     setting = frappe.get_single("ShipsGo Setting")
     # First run (last_shipment_sync_at is None) => full back-fill of ALL shipments.
     # Subsequent runs are windowed to only what changed since the last successful sync.
-    updated_since = setting.last_shipment_sync_at
+    updated_since = _to_utc_filter_value(setting.last_shipment_sync_at)
     run_started = now_datetime()
 
     shipments, ok = _fetch_shipments(base_url, token, updated_since)
