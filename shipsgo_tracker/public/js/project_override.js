@@ -1,29 +1,61 @@
 frappe.ui.form.on("Project", {
 	refresh: function (frm) {
-		frappe.call({
-			method: "frappe.client.get_value",
-			args: {
-				doctype: "ShipsGo Setting",
-				fieldname: "shipsgo_dashboard_api_url_copy",
-			},
-			callback: function (r) {
-				if (r.message && r.message.shipsgo_dashboard_api_url_copy) {
-					let base_url = frappe.utils.escape_html(
-						r.message.shipsgo_dashboard_api_url_copy
-					);
-					let tracking_url = `${base_url}/dashboard/track-and-trace/my-shipments`;
-
-					frm.fields_dict.custom_shipsgo_tracking_link.$wrapper.html(
-						`<a href="${tracking_url}" target="_blank" style="color:#1f4fff; font-weight:600;">
-							Open Tracking Link
-						</a>`
-					);
-				}
-			},
-		});
+		render_tracking_link(frm);
 		add_custom_buttons(frm);
 	},
 });
+
+function render_tracking_link(frm) {
+	const field = frm.fields_dict.custom_shipsgo_tracking_link;
+	if (!field) return;
+	if (!frm.doc.custom_shipsgo_shipment_id) {
+		field.$wrapper.html("");
+		return;
+	}
+	const url = frm.doc.custom_shipsgo_tracking_url;
+	if (url) {
+		field.$wrapper.html(
+			`<a href="${frappe.utils.escape_html(url)}" target="_blank" style="color:#1f4fff; font-weight:600;">${__("Open Tracking")}</a>`
+		);
+	} else {
+		field.$wrapper.html(
+			`<button class="btn btn-xs btn-default" id="shipsgo-open-tracking">${__("Open Tracking")}</button>`
+		);
+		field.$wrapper.find("#shipsgo-open-tracking").on("click", function () {
+			load_tracking_link(frm);
+		});
+	}
+}
+
+function load_tracking_link(frm) {
+	frappe.call({
+		method: "shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.refresh_single_shipment",
+		args: { docname: frm.doc.name },
+		freeze: true,
+		freeze_message: __("Loading live tracking link..."),
+		callback: function (r) {
+			const res = r.message || {};
+			if (res.status === "success" && res.tracking_url) {
+				frappe.show_alert({ message: __("Tracking link saved."), indicator: "green" });
+				frm.reload_doc();
+			} else if (res.status === "success") {
+				frappe.msgprint({
+					title: __("Not Available"),
+					message: __("Live tracking not available yet."),
+					indicator: "orange",
+				});
+			} else if (res.status === "retryable") {
+				frappe.msgprint({ title: __("Temporary Issue"), message: res.error, indicator: "orange" });
+			} else {
+				frappe.msgprint({
+					title: __("Not Updated"),
+					message: res.error || __("Could not load tracking."),
+					indicator: "red",
+				});
+			}
+		},
+	});
+}
 
 // Consolidated function for all buttons
 function add_custom_buttons(frm) {
@@ -117,7 +149,7 @@ function add_custom_buttons(frm) {
 						const res = r.message || {};
 						if (res.status === "success") {
 							frappe.show_alert({
-								message: __("Tracking updated."),
+								message: __("Tracking updated — live-map link saved."),
 								indicator: "green",
 							});
 							frm.reload_doc();
