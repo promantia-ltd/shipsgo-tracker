@@ -99,9 +99,11 @@ def _fetch_shipments(base_url, token, updated_since):
             params["filters[updated_at]"] = f"gte:{updated_since}"
         try:
             resp = requests.get(f"{base_url}{OCEAN_LIST_PATH}", headers=headers, params=params, timeout=30)
-        except (Timeout, ConnectionError):
+        except (Timeout, ConnectionError) as exc:
+            frappe.log_error(title="ShipsGo list network error", message=str(exc))
             return shipments, False
         if resp.status_code == 429:
+            frappe.log_error(title="ShipsGo list HTTP 429", message="Rate limited by ShipsGo.")
             return shipments, False
         if resp.status_code != 200:
             frappe.log_error(title=f"ShipsGo list HTTP {resp.status_code}", message=resp.text)
@@ -126,10 +128,10 @@ def _fetch_shipments(base_url, token, updated_since):
 
 @frappe.whitelist()
 def refresh_active_shipments():
-    """Scheduled sync: read all shipments via the default token, match to Projects
-    by shipment id, write ETA/ETD/live-status. Advances the sync window only on a
-    fully successful pass. Skips silently if the integration is disabled or no
-    default token is configured (so a scheduled run never crashes)."""
+    """Scheduled sync: read all shipments via the default token (bulk LIST), match to
+    Projects by shipment id, write ETA/ETD/live-status, the resolved container number,
+    and the container-search fallback URL (never downgrading a stored map deep-link).
+    Advances the sync window only on a fully successful pass; logs failures to Error Log."""
     try:
         token, base_url = get_access_token(use_default=True)
     except frappe.ValidationError:
@@ -138,33 +140,44 @@ def refresh_active_shipments():
     projects = frappe.get_all(
         "Project",
         filters={"custom_shipsgo_shipment_id": ["is", "set"]},
-        fields=["name", "custom_shipsgo_shipment_id"],
+        fields=["name", "custom_shipsgo_shipment_id", "custom_shipsgo_tracking_url"],
     )
-    id_to_project = {str(p.custom_shipsgo_shipment_id): p.name for p in projects}
-    if not id_to_project:
+    by_id = {str(p.custom_shipsgo_shipment_id): p for p in projects}
+    if not by_id:
         return {"updated": 0, "ok": True}
 
     setting = frappe.get_single("ShipsGo Setting")
-    # First run (last_shipment_sync_at is None) => full back-fill of ALL shipments.
-    # Subsequent runs are windowed to only what changed since the last successful sync.
+    # First run (last_shipment_sync_at is None) => full back-fill; later runs windowed.
     updated_since = _to_utc_filter_value(setting.last_shipment_sync_at)
     run_started = now_datetime()
+    map_base, search_base = _resolve_tracking_bases()
 
     shipments, ok = _fetch_shipments(base_url, token, updated_since)
 
     updated = 0
     for shipment in shipments:
-        project = id_to_project.get(str(shipment.get("id")))
+        project = by_id.get(str(shipment.get("id")))
         if not project:
             continue
-        for field, value in map_shipment_fields(shipment).items():
-            frappe.db.set_value("Project", project, field, value, update_modified=False)
+        updates = map_shipment_fields(shipment)
+        container = shipment.get("container_number")
+        if container:
+            updates["custom_shipsgo_container_number"] = container
+        url = _build_tracking_url(shipment.get("id"), shipment, map_base, search_base)
+        # No-downgrade: never replace a stored map deep-link with a container-search URL.
+        if url and "token=" not in (project.custom_shipsgo_tracking_url or ""):
+            updates["custom_shipsgo_tracking_url"] = url
+        for field, value in updates.items():
+            frappe.db.set_value("Project", project.name, field, value, update_modified=False)
         updated += 1
 
-    # Advance the window only on a clean pass, so a failed/partial run keeps the
-    # backlog for the next run.
     if ok:
         frappe.db.set_single_value("ShipsGo Setting", "last_shipment_sync_at", run_started)
+    else:
+        frappe.log_error(
+            title="ShipsGo scheduled sync completed with errors",
+            message=f"updated={updated}; recoverable error during fetch; window not advanced.",
+        )
     frappe.db.commit()
     return {"updated": updated, "ok": ok}
 
