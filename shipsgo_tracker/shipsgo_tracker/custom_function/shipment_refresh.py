@@ -68,10 +68,10 @@ def map_shipment_fields(shipment):
 
     Always returns live status + last_synced. ETA/ETD are included only when the
     shipment has a `route` (absent for NEW/INPROGRESS/UNTRACKED)."""
-    updates = {
-        "custom_shipsgo_live_status": shipment.get("status"),
-        "custom_shipsgo_last_synced": now_datetime(),
-    }
+    updates = {"custom_shipsgo_last_synced": now_datetime()}
+    status = shipment.get("status")
+    if status:
+        updates["custom_shipsgo_live_status"] = status
     route = shipment.get("route") or None
     if route:
         pol = route.get("port_of_loading") or {}

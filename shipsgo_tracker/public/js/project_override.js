@@ -15,7 +15,7 @@ function render_tracking_link(frm) {
 	const url = frm.doc.custom_shipsgo_tracking_url;
 	if (url) {
 		field.$wrapper.html(
-			`<a href="${frappe.utils.escape_html(url)}" target="_blank" style="color:#1f4fff; font-weight:600;">${__("Open Tracking")}</a>`
+			`<a href="${frappe.utils.escape_html(url)}" target="_blank" rel="noopener noreferrer" style="color:#1f4fff; font-weight:600;">${__("Open Tracking")}</a>`
 		);
 	} else {
 		field.$wrapper.html(
