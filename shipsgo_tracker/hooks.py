@@ -151,8 +151,8 @@ scheduler_events = {
 		"shipsgo_tracker.shipsgo_tracker.doctype.shipping_carriers.shipping_carriers.fetch_carrier_list"
 	],
 	"cron": {
-		# ~3x per day, matching ShipsGo's update cadence
-		"0 */8 * * *": [
+		# once daily at midnight (site timezone), after work hours
+		"0 0 * * *": [
 			"shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.refresh_active_shipments"
 		]
 	},
