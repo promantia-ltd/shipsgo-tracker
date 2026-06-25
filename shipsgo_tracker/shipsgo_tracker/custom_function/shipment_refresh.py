@@ -67,7 +67,9 @@ def map_shipment_fields(shipment):
     """Map a ShipsGo shipment object to Project field updates.
 
     Always returns live status + last_synced. ETA/ETD are included only when the
-    shipment has a `route` (absent for NEW/INPROGRESS/UNTRACKED)."""
+    shipment has a `route` (absent for NEW/INPROGRESS/UNTRACKED). ETA prefers
+    ShipsGo's ML prediction (`date_of_discharge_predicted`) when present, falling
+    back to the carrier's scheduled `date_of_discharge`."""
     updates = {"custom_shipsgo_last_synced": now_datetime()}
     status = shipment.get("status")
     if status:
@@ -77,7 +79,9 @@ def map_shipment_fields(shipment):
         pol = route.get("port_of_loading") or {}
         pod = route.get("port_of_discharge") or {}
         etd = _to_system_datetime(pol.get("date_of_loading"))
-        eta = _to_system_datetime(pod.get("date_of_discharge"))
+        eta = _to_system_datetime(
+            pod.get("date_of_discharge_predicted") or pod.get("date_of_discharge")
+        )
         if etd:
             updates["custom_shipsgo_etd"] = etd
         if eta:
