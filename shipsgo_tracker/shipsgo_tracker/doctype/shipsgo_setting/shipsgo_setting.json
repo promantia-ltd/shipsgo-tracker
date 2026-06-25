@@ -8,7 +8,9 @@
   "enable",
   "shipsgo_base_api_url",
   "shipsgo_dashboard_api_url_copy",
-  "last_shipment_sync_at"
+  "last_shipment_sync_at",
+  "tracking_map_base_url",
+  "tracking_public_search_url"
  ],
  "fields": [
   {
@@ -38,6 +40,18 @@
    "read_only": 1,
    "hidden": 1,
    "no_copy": 1
+  },
+  {
+   "fieldname": "tracking_map_base_url",
+   "fieldtype": "Data",
+   "label": "Tracking Map Base URL",
+   "description": "Optional. Default: https://map.shipsgo.com/ocean/shipments"
+  },
+  {
+   "fieldname": "tracking_public_search_url",
+   "fieldtype": "Data",
+   "label": "Tracking Public Search URL",
+   "description": "Optional. Default: https://shipsgo.com/live-map-container-tracking"
   }
  ],
  "grid_page_length": 50,
