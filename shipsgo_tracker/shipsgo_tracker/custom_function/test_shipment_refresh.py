@@ -340,3 +340,34 @@ class TestTrackingUrlBuilder(FrappeTestCase):
         map_base, search_base = sr._resolve_tracking_bases()
         self.assertEqual(map_base, "https://map.custom/ocean/shipments")
         self.assertEqual(search_base, "https://search.custom/track")
+
+
+class TestFetchShipmentDetails(FrappeTestCase):
+    def test_success(self):
+        payload = {"message": "SUCCESS", "shipment": {"id": 1, "status": "SAILING"}}
+        with patch.object(sr.requests, "get", return_value=_resp(200, payload)) as g:
+            shipment, status = sr._fetch_shipment_details("https://api/v2", "tok", "1")
+        self.assertEqual(status, "success")
+        self.assertEqual(shipment["status"], "SAILING")
+        self.assertEqual(g.call_args[0][0], "https://api/v2/ocean/shipments/1")
+
+    def test_404_not_found(self):
+        with patch.object(sr.requests, "get", return_value=_resp(404, {})):
+            shipment, status = sr._fetch_shipment_details("https://api/v2", "tok", "1")
+        self.assertIsNone(shipment)
+        self.assertEqual(status, "not_found")
+
+    def test_non_success_message_not_found(self):
+        with patch.object(sr.requests, "get", return_value=_resp(200, {"message": "FAILURE", "shipment": {}})):
+            shipment, status = sr._fetch_shipment_details("https://api/v2", "tok", "1")
+        self.assertEqual(status, "not_found")
+
+    def test_429_retryable(self):
+        with patch.object(sr.requests, "get", return_value=_resp(429, {})):
+            shipment, status = sr._fetch_shipment_details("https://api/v2", "tok", "1")
+        self.assertEqual(status, "retryable")
+
+    def test_timeout_retryable(self):
+        with patch.object(sr.requests, "get", side_effect=sr.Timeout()):
+            shipment, status = sr._fetch_shipment_details("https://api/v2", "tok", "1")
+        self.assertEqual(status, "retryable")

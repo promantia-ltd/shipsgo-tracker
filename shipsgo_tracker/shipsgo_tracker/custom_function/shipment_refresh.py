@@ -203,3 +203,25 @@ def refresh_single_shipment(docname):
         frappe.db.set_value("Project", docname, field, value, update_modified=False)
     frappe.db.commit()
     return {"status": "success", "live_status": shipment.get("status")}
+
+
+def _fetch_shipment_details(base_url, token, shipment_id):
+    """GET /ocean/shipments/{id}. Returns (shipment|None, status) where status is
+    'success' | 'not_found' | 'retryable'."""
+    headers = {"X-Shipsgo-User-Token": token, "Content-Type": "application/json"}
+    try:
+        resp = requests.get(f"{base_url}{OCEAN_LIST_PATH}/{shipment_id}", headers=headers, timeout=30)
+    except (Timeout, ConnectionError):
+        return None, "retryable"
+    if resp.status_code == 429:
+        return None, "retryable"
+    if resp.status_code == 404:
+        return None, "not_found"
+    if resp.status_code != 200:
+        frappe.log_error(title=f"ShipsGo details HTTP {resp.status_code}", message=resp.text)
+        return None, "retryable"
+    payload = resp.json()
+    shipment = payload.get("shipment") or {}
+    if payload.get("message") != "SUCCESS" or not shipment:
+        return None, "not_found"
+    return shipment, "success"
