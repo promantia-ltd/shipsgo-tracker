@@ -16,6 +16,28 @@ OCEAN_LIST_PATH = "/ocean/shipments"
 PAGE_LIMIT = 50  # safety cap on pagination loops
 PAGE_SIZE = 100  # max take allowed by the API
 
+DEFAULT_MAP_DEEPLINK = "https://map.shipsgo.com/ocean/shipments"
+DEFAULT_PUBLIC_SEARCH = "https://shipsgo.com/live-map-container-tracking"
+
+
+def _resolve_tracking_bases():
+    """Base URLs from ShipsGo Setting, falling back to the constants when blank."""
+    setting = frappe.get_single("ShipsGo Setting")
+    map_base = (setting.get("tracking_map_base_url") or "").strip() or DEFAULT_MAP_DEEPLINK
+    search_base = (setting.get("tracking_public_search_url") or "").strip() or DEFAULT_PUBLIC_SEARCH
+    return map_base.rstrip("/"), search_base
+
+
+def _build_tracking_url(shipment_id, shipment, map_base, search_base):
+    """Map deep-link when a token exists; container-search fallback; else None."""
+    map_token = (shipment.get("tokens") or {}).get("map")
+    if map_token:
+        return f"{map_base}/{shipment_id}?token={map_token}"
+    container = shipment.get("container_number")
+    if container:
+        return f"{search_base}?query={container}"
+    return None
+
 
 def _to_system_datetime(value):
     """Convert a ShipsGo ISO-8601 timestamp (often offset-aware) to a naive

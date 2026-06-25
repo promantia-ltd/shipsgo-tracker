@@ -305,3 +305,38 @@ class TestRefreshSingle(FrappeTestCase):
         with patch.object(sr.requests, "get", return_value=_resp(200, payload)):
             result = sr.refresh_single_shipment(self.project.name)
         self.assertEqual(result["status"], "not_found")
+
+
+class TestTrackingUrlBuilder(FrappeTestCase):
+    def test_build_map_deeplink_when_token(self):
+        shipment = {"container_number": "ABCD1234567", "tokens": {"map": "tok-uuid"}}
+        url = sr._build_tracking_url("6083781", shipment, "https://map.x/ocean/shipments", "https://s.x/q")
+        self.assertEqual(url, "https://map.x/ocean/shipments/6083781?token=tok-uuid")
+
+    def test_build_container_search_when_no_token(self):
+        shipment = {"container_number": "ABCD1234567", "tokens": {}}
+        url = sr._build_tracking_url("6083781", shipment, "https://map.x/ocean/shipments", "https://s.x/q")
+        self.assertEqual(url, "https://s.x/q?query=ABCD1234567")
+
+    def test_build_none_when_neither(self):
+        shipment = {"container_number": None, "tokens": None}
+        url = sr._build_tracking_url("6083781", shipment, "https://map.x/ocean/shipments", "https://s.x/q")
+        self.assertIsNone(url)
+
+    def test_resolve_bases_fallback_when_blank(self):
+        s = frappe.get_single("ShipsGo Setting")
+        s.tracking_map_base_url = None
+        s.tracking_public_search_url = None
+        s.save(ignore_permissions=True)
+        map_base, search_base = sr._resolve_tracking_bases()
+        self.assertEqual(map_base, sr.DEFAULT_MAP_DEEPLINK)
+        self.assertEqual(search_base, sr.DEFAULT_PUBLIC_SEARCH)
+
+    def test_resolve_bases_uses_setting_and_strips_slash(self):
+        s = frappe.get_single("ShipsGo Setting")
+        s.tracking_map_base_url = "https://map.custom/ocean/shipments/"
+        s.tracking_public_search_url = "https://search.custom/track"
+        s.save(ignore_permissions=True)
+        map_base, search_base = sr._resolve_tracking_bases()
+        self.assertEqual(map_base, "https://map.custom/ocean/shipments")
+        self.assertEqual(search_base, "https://search.custom/track")
