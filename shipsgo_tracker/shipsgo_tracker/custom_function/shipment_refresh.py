@@ -17,7 +17,6 @@ PAGE_LIMIT = 50  # safety cap on pagination loops
 PAGE_SIZE = 100  # max take allowed by the API
 
 DEFAULT_MAP_DEEPLINK = "https://map.shipsgo.com/ocean/shipments"
-DEFAULT_PUBLIC_SEARCH = "https://shipsgo.com/live-map-container-tracking"
 
 
 def _resolve_map_base():
@@ -134,8 +133,9 @@ def _fetch_shipments(base_url, token, updated_since):
 @frappe.whitelist()
 def refresh_active_shipments():
     """Scheduled sync: read all shipments via the default token (bulk LIST), match to
-    Projects by shipment id, write ETA/ETD/live-status, the resolved container number,
-    and the container-search fallback URL (never downgrading a stored map deep-link).
+    Projects by shipment id, and write the five UTC ETA/ETD strings, live status, and the
+    resolved container number. The tracking URL (token map deep-link) is DETAILS-only and
+    is NOT written here — it is captured on Project form open / via the Refresh button.
     Advances the sync window only on a fully successful pass; logs failures to Error Log."""
     try:
         token, base_url = get_access_token(use_default=True)
