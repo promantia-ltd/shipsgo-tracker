@@ -39,18 +39,6 @@ def _build_tracking_url(shipment_id, shipment, map_base, search_base):
     return None
 
 
-def _to_system_datetime(value):
-    """Convert a ShipsGo ISO-8601 timestamp (often offset-aware) to a naive
-    datetime in the site's system timezone, for a Frappe Datetime field."""
-    if not value:
-        return None
-    dt = datetime.datetime.fromisoformat(value)
-    if dt.tzinfo is None:
-        return dt
-    system_tz = ZoneInfo(get_system_timezone())
-    return dt.astimezone(system_tz).replace(tzinfo=None)
-
-
 def _to_utc_filter_value(value, margin_hours=1):
     """Convert a naive system-timezone datetime (e.g. last_shipment_sync_at) to a
     UTC 'YYYY-MM-DD HH:MM:SS' string for ShipsGo's filters[updated_at] (which is UTC),
@@ -63,13 +51,25 @@ def _to_utc_filter_value(value, margin_hours=1):
     return dt_utc.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def map_shipment_fields(shipment):
-    """Map a ShipsGo shipment object to Project field updates.
+def _to_utc_string(value):
+    """Convert a ShipsGo offset-aware ISO-8601 timestamp (port-local) to a
+    'DD-MM-YYYY HH:MM UTC' display string. Naive input is assumed already UTC."""
+    if not value:
+        return None
+    dt = datetime.datetime.fromisoformat(value)
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(datetime.timezone.utc)
+    return dt.strftime("%d-%m-%Y %H:%M") + " UTC"
 
-    Always returns live status + last_synced. ETA/ETD are included only when the
-    shipment has a `route` (absent for NEW/INPROGRESS/UNTRACKED). ETA prefers
-    ShipsGo's ML prediction (`date_of_discharge_predicted`) when present, falling
-    back to the carrier's scheduled `date_of_discharge`."""
+
+def map_shipment_fields(shipment):
+    """Map a ShipsGo shipment to Project field updates. Always returns live status
+    + last_synced. The five UTC date strings are included only when the shipment has
+    a `route` (absent for NEW/INPROGRESS/UNTRACKED) — never overwrite with None.
+
+    ETA (primary) prefers ShipsGo's ML prediction (`date_of_discharge_predicted`)
+    and falls back to the carrier's scheduled `date_of_discharge`; the carrier-current
+    and carrier-original variants are stored alongside in their own fields."""
     updates = {"custom_shipsgo_last_synced": now_datetime()}
     status = shipment.get("status")
     if status:
@@ -78,14 +78,18 @@ def map_shipment_fields(shipment):
     if route:
         pol = route.get("port_of_loading") or {}
         pod = route.get("port_of_discharge") or {}
-        etd = _to_system_datetime(pol.get("date_of_loading"))
-        eta = _to_system_datetime(
-            pod.get("date_of_discharge_predicted") or pod.get("date_of_discharge")
-        )
-        if etd:
-            updates["custom_shipsgo_etd"] = etd
-        if eta:
-            updates["custom_shipsgo_eta"] = eta
+        values = {
+            "custom_shipsgo_etd": _to_utc_string(pol.get("date_of_loading")),
+            "custom_shipsgo_etd_initial": _to_utc_string(pol.get("date_of_loading_initial")),
+            "custom_shipsgo_eta": _to_utc_string(
+                pod.get("date_of_discharge_predicted") or pod.get("date_of_discharge")
+            ),
+            "custom_shipsgo_eta_carrier": _to_utc_string(pod.get("date_of_discharge")),
+            "custom_shipsgo_eta_initial": _to_utc_string(pod.get("date_of_discharge_initial")),
+        }
+        for field, val in values.items():
+            if val:
+                updates[field] = val
     return updates
 
 
