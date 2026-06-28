@@ -20,22 +20,19 @@ DEFAULT_MAP_DEEPLINK = "https://map.shipsgo.com/ocean/shipments"
 DEFAULT_PUBLIC_SEARCH = "https://shipsgo.com/live-map-container-tracking"
 
 
-def _resolve_tracking_bases():
-    """Base URLs from ShipsGo Setting, falling back to the constants when blank."""
+def _resolve_map_base():
+    """Map deep-link base from ShipsGo Setting, falling back to the constant when blank."""
     setting = frappe.get_single("ShipsGo Setting")
     map_base = (setting.get("tracking_map_base_url") or "").strip() or DEFAULT_MAP_DEEPLINK
-    search_base = (setting.get("tracking_public_search_url") or "").strip() or DEFAULT_PUBLIC_SEARCH
-    return map_base.rstrip("/"), search_base
+    return map_base.rstrip("/")
 
 
-def _build_tracking_url(shipment_id, shipment, map_base, search_base):
-    """Map deep-link when a token exists; container-search fallback; else None."""
+def _build_tracking_url(shipment_id, shipment, map_base):
+    """ShipsGo map deep-link when a map token is present; else None (Option B — no
+    public container-search fallback). tokens.map is DETAILS-only."""
     map_token = (shipment.get("tokens") or {}).get("map")
     if map_token:
         return f"{map_base}/{shipment_id}?token={map_token}"
-    container = shipment.get("container_number")
-    if container:
-        return f"{search_base}?query={container}"
     return None
 
 
@@ -148,7 +145,7 @@ def refresh_active_shipments():
     projects = frappe.get_all(
         "Project",
         filters={"custom_shipsgo_shipment_id": ["is", "set"]},
-        fields=["name", "custom_shipsgo_shipment_id", "custom_shipsgo_tracking_url"],
+        fields=["name", "custom_shipsgo_shipment_id"],
     )
     by_id = {str(p.custom_shipsgo_shipment_id): p for p in projects}
     if not by_id:
@@ -158,7 +155,6 @@ def refresh_active_shipments():
     # First run (last_shipment_sync_at is None) => full back-fill; later runs windowed.
     updated_since = _to_utc_filter_value(setting.last_shipment_sync_at)
     run_started = now_datetime()
-    map_base, search_base = _resolve_tracking_bases()
 
     shipments, ok = _fetch_shipments(base_url, token, updated_since)
 
@@ -171,10 +167,8 @@ def refresh_active_shipments():
         container = shipment.get("container_number")
         if container:
             updates["custom_shipsgo_container_number"] = container
-        url = _build_tracking_url(shipment.get("id"), shipment, map_base, search_base)
-        # No-downgrade: never replace a stored map deep-link with a container-search URL.
-        if url and "token=" not in (project.custom_shipsgo_tracking_url or ""):
-            updates["custom_shipsgo_tracking_url"] = url
+        # Option B: the tracking URL (token map deep-link) is DETAILS-only, captured
+        # on Project form open / via the Refresh button — never written by the scheduler.
         for field, value in updates.items():
             frappe.db.set_value("Project", project.name, field, value, update_modified=False)
         updated += 1
@@ -212,8 +206,8 @@ def refresh_single_shipment(docname):
     container = shipment.get("container_number")
     if container:
         updates["custom_shipsgo_container_number"] = container
-    map_base, search_base = _resolve_tracking_bases()
-    url = _build_tracking_url(shipment_id, shipment, map_base, search_base)
+    map_base = _resolve_map_base()
+    url = _build_tracking_url(shipment_id, shipment, map_base)
     if url:
         updates["custom_shipsgo_tracking_url"] = url
 
