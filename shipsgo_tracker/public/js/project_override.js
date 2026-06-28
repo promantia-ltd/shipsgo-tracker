@@ -17,43 +17,45 @@ function render_tracking_link(frm) {
 		field.$wrapper.html(
 			`<a href="${frappe.utils.escape_html(url)}" target="_blank" rel="noopener noreferrer" style="color:#1f4fff; font-weight:600;">${__("Open Tracking")}</a>`
 		);
-	} else {
-		field.$wrapper.html(
-			`<button class="btn btn-xs btn-default" id="shipsgo-open-tracking">${__("Open Tracking")}</button>`
-		);
-		field.$wrapper.find("#shipsgo-open-tracking").on("click", function () {
-			load_tracking_link(frm);
-		});
+		return;
 	}
-}
-
-function load_tracking_link(frm) {
+	// No stored link: lazy-load it once per form session (non-blocking, silent on failure).
+	if (frm.__shipsgo_tracking_tried) {
+		render_tracking_placeholder(frm, field);
+		return;
+	}
+	frm.__shipsgo_tracking_tried = true;
+	field.$wrapper.html(`<span class="text-muted">${__("Loading live tracking…")}</span>`);
 	frappe.call({
 		method: "shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.refresh_single_shipment",
 		args: { docname: frm.doc.name },
-		freeze: true,
-		freeze_message: __("Loading live tracking link..."),
 		callback: function (r) {
 			const res = r.message || {};
 			if (res.status === "success" && res.tracking_url) {
-				frappe.show_alert({ message: __("Tracking link saved."), indicator: "green" });
-				frm.reload_doc();
-			} else if (res.status === "success") {
-				frappe.msgprint({
-					title: __("Not Available"),
-					message: __("Live tracking not available yet."),
-					indicator: "orange",
-				});
-			} else if (res.status === "retryable") {
-				frappe.msgprint({ title: __("Temporary Issue"), message: res.error, indicator: "orange" });
+				frm.doc.custom_shipsgo_tracking_url = res.tracking_url;
+				field.$wrapper.html(
+					`<a href="${frappe.utils.escape_html(res.tracking_url)}" target="_blank" rel="noopener noreferrer" style="color:#1f4fff; font-weight:600;">${__("Open Tracking")}</a>`
+				);
 			} else {
-				frappe.msgprint({
-					title: __("Not Updated"),
-					message: res.error || __("Could not load tracking."),
-					indicator: "red",
-				});
+				render_tracking_placeholder(frm, field);
 			}
 		},
+		error: function () {
+			render_tracking_placeholder(frm, field);
+		},
+	});
+}
+
+function render_tracking_placeholder(frm, field) {
+	field.$wrapper.html(
+		`<div class="text-muted" style="margin-bottom:4px;">${__(
+			"Live tracking link is being prepared. If it does not appear, use the button below."
+		)}</div>` +
+			`<button class="btn btn-xs btn-default" id="shipsgo-open-tracking">${__("Open Tracking")}</button>`
+	);
+	field.$wrapper.find("#shipsgo-open-tracking").on("click", function () {
+		frm.__shipsgo_tracking_tried = false;
+		render_tracking_link(frm);
 	});
 }
 
