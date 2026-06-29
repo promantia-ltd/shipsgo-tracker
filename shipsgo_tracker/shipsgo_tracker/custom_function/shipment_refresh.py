@@ -190,7 +190,16 @@ def refresh_single_shipment(docname):
     Reads ONE shipment via the DETAILS endpoint (default token) — which returns
     status + route + tokens.map in one call — and persists ETA/ETD/live-status,
     the resolved container number, and the tracking URL (map deep-link preferred)."""
-    token, base_url = get_access_token(use_default=True)
+    # Token resolution can frappe.throw (integration disabled / no default token /
+    # token cannot be decrypted). Catch it and return a status instead of throwing,
+    # so the on-open lazy-load stays silent (placeholder + retry) rather than popping
+    # a framework error dialog; clear the queued throw message and log for support.
+    try:
+        token, base_url = get_access_token(use_default=True)
+    except Exception as exc:
+        frappe.local.message_log = []
+        frappe.log_error(title="ShipsGo single refresh: token unavailable", message=str(exc))
+        return {"status": "retryable", "error": "ShipsGo integration is currently unavailable."}
 
     shipment_id = frappe.db.get_value("Project", docname, "custom_shipsgo_shipment_id")
     if not shipment_id:
@@ -223,9 +232,11 @@ def _fetch_shipment_details(base_url, token, shipment_id):
     headers = {"X-Shipsgo-User-Token": token, "Content-Type": "application/json"}
     try:
         resp = requests.get(f"{base_url}{OCEAN_LIST_PATH}/{shipment_id}", headers=headers, timeout=30)
-    except (Timeout, ConnectionError):
+    except (Timeout, ConnectionError) as exc:
+        frappe.log_error(title="ShipsGo details network error", message=f"shipment {shipment_id}: {exc}")
         return None, "retryable"
     if resp.status_code == 429:
+        frappe.log_error(title="ShipsGo details HTTP 429", message=f"Rate limited for shipment {shipment_id}.")
         return None, "retryable"
     if resp.status_code == 404:
         return None, "not_found"
