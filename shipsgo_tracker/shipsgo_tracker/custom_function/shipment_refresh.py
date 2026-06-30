@@ -248,3 +248,14 @@ def _fetch_shipment_details(base_url, token, shipment_id):
     if payload.get("message") != "SUCCESS" or not shipment:
         return None, "not_found"
     return shipment, "success"
+
+
+def enable_sync_job_log():
+    """Enable Scheduled Job Log for the daily shipment sync (Cron jobs default to
+    create_log=0). Idempotent; runs via the after_migrate hook."""
+    name = frappe.db.get_value(
+        "Scheduled Job Type",
+        {"method": "shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.refresh_active_shipments"},
+    )
+    if name:
+        frappe.db.set_value("Scheduled Job Type", name, "create_log", 1)
