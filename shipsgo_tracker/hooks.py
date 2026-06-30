@@ -158,6 +158,10 @@ scheduler_events = {
 	},
 }
 
+after_migrate = [
+	"shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.enable_sync_job_log"
+]
+
 # Testing
 # -------
 
