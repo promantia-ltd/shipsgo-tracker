@@ -9,6 +9,10 @@ import frappe
 import requests
 from requests.exceptions import ConnectionError, Timeout
 
+from shipsgo_tracker.shipsgo_tracker.custom_function.project_doc_custom_function import (
+    get_access_token,
+)
+
 FOLLOWERS_PATH = "/ocean/shipments/{shipment_id}/followers"
 TIMEOUT = 30
 
@@ -85,3 +89,116 @@ def _remove_follower(base_url, token, shipment_id, follower_id):
     if resp.status_code == 403:
         return "ShipsGo token is not permitted to remove followers (HTTP 403)"
     return f"HTTP {resp.status_code}: {resp.text[:200]}"
+
+
+def _set(row_name, **values):
+    """Write read-only row fields without touching the parent's modified stamp."""
+    frappe.db.set_value("Project Follower", row_name, values, update_modified=False)
+
+
+def _needs_sync(row):
+    """True when intent and ShipsGo state disagree."""
+    return (row.enabled and row.status != "Active") or (not row.enabled and row.status == "Active")
+
+
+def _process_row(row, shipment_id, base_url, token):
+    """Move one row from its current state toward its intent."""
+    if row.enabled:
+        email = frappe.db.get_value("Contact", row.contact, "email_id") if row.contact else None
+        if not email:
+            _set(row.name, status="Failed", last_error="Contact has no email address")
+            return
+
+        follower_id, registered, error = _add_follower(base_url, token, shipment_id, email)
+        if error:
+            _set(row.name, status="Failed", last_error=error)
+            return
+        _set(
+            row.name,
+            status="Active",
+            shipsgo_follower_id=follower_id,
+            email=registered,
+            last_error="",
+        )
+        return
+
+    if not row.shipsgo_follower_id:
+        _set(row.name, status="Failed", last_error="No ShipsGo follower id stored; cannot remove")
+        return
+
+    error = _remove_follower(base_url, token, shipment_id, row.shipsgo_follower_id)
+    if error:
+        # Deliberately stays Active: intent and reality diverge, and that must be visible.
+        _set(row.name, last_error=error)
+        return
+    _set(row.name, status="Removed", shipsgo_follower_id=0, last_error="")
+
+
+def sync_project_followers(project_name):
+    """Reconcile one Project's follower rows against ShipsGo. Safe to re-run."""
+    rows = frappe.get_all(
+        "Project Follower",
+        filters={"parent": project_name, "parenttype": "Project"},
+        fields=["name", "enabled", "contact", "email", "shipsgo_follower_id", "status"],
+    )
+    pending = [row for row in rows if _needs_sync(row)]
+    if not pending:
+        return {"processed": 0}
+
+    shipment_id = frappe.db.get_value("Project", project_name, "custom_shipsgo_shipment_id")
+    if not shipment_id:
+        # Normal state, not an error: the shipment may not have been created yet.
+        return {"processed": 0}
+
+    try:
+        token, base_url = get_access_token(use_default=True)
+    except Exception as exc:
+        frappe.log_error(title="ShipsGo followers: token unavailable", message=str(exc))
+        return {"processed": 0}
+
+    for row in pending:
+        try:
+            _process_row(row, shipment_id, base_url, token)
+        except Exception:
+            frappe.log_error(
+                title=f"ShipsGo follower sync failed: {project_name}",
+                message=frappe.get_traceback(),
+            )
+    return {"processed": len(pending)}
+
+
+def sync_on_project_update(doc, method=None):
+    """on_update hook. Must never prevent the Project from saving."""
+    try:
+        sync_project_followers(doc.name)
+    except Exception:
+        frappe.log_error(
+            title=f"ShipsGo follower sync failed on save: {doc.name}",
+            message=frappe.get_traceback(),
+        )
+
+
+def sync_all_project_followers():
+    """Daily catch-up: registers rows whose shipment now exists, retries failures.
+
+    Needed because `create_shipment` writes the shipment id with `db_set`, which does
+    not fire `on_update` — so a follower enabled before the shipment existed would
+    otherwise never register.
+    """
+    projects = frappe.db.sql_list(
+        """
+        select distinct parent from `tabProject Follower`
+        where parenttype = 'Project'
+          and ((enabled = 1 and status != 'Active') or (enabled = 0 and status = 'Active'))
+        """
+    )
+    for name in projects:
+        try:
+            sync_project_followers(name)
+        except Exception:
+            frappe.log_error(
+                title=f"ShipsGo follower daily sync failed: {name}",
+                message=frappe.get_traceback(),
+            )
+        frappe.db.commit()
+    return {"projects": len(projects)}
