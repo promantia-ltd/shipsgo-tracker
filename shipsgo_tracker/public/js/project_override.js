@@ -1,7 +1,33 @@
 frappe.ui.form.on("Project", {
+	setup: function (frm) {
+		// Only this Customer's contacts may follow this shipment.
+		frm.set_query("contact", "custom_followers", function () {
+			return {
+				query: "frappe.contacts.doctype.contact.contact.contact_query",
+				filters: { link_doctype: "Customer", link_name: frm.doc.customer || "" },
+			};
+		});
+	},
 	refresh: function (frm) {
 		render_tracking_link(frm);
 		add_custom_buttons(frm);
+	},
+});
+
+frappe.ui.form.on("Project Follower", {
+	// Pre-fill the contact when a follower row is added. Stays blank when the
+	// customer has two or more contacts flagged Is Shipping Contact.
+	custom_followers_add: function (frm, cdt, cdn) {
+		if (!frm.doc.customer) return;
+		frappe.call({
+			method: "shipsgo_tracker.shipsgo_tracker.custom_function.project_followers.default_contact_for_customer",
+			args: { customer: frm.doc.customer },
+			callback: function (r) {
+				if (r.message) {
+					frappe.model.set_value(cdt, cdn, "contact", r.message);
+				}
+			},
+		});
 	},
 });
 
