@@ -244,5 +244,8 @@ after_migrate = [
 # ignore_translatable_strings_from = []
 
 fixtures = [
-	{"doctype": "Custom Field", "filters": [["module", "=", "Shipsgo Tracker"], ["dt", "=", "Project"]]}
+	{
+		"doctype": "Custom Field",
+		"filters": [["module", "=", "Shipsgo Tracker"], ["dt", "in", ["Project", "Contact"]]],
+	}
 ]
