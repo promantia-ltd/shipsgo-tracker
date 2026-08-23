@@ -65,7 +65,13 @@ def _add_follower(base_url, token, shipment_id, email):
         return None, None, f"Network error: {exc}"
 
     if resp.status_code in (200, 409):
-        follower = (resp.json() or {}).get("follower") or {}
+        try:
+            payload = resp.json() or {}
+        except ValueError:
+            # A proxy or gateway can return HTML with a 200. Report it on the row
+            # rather than letting it escape as an exception.
+            return None, None, f"HTTP {resp.status_code} with a non-JSON body"
+        follower = payload.get("follower") or {}
         if not follower.get("id"):
             return None, None, f"HTTP {resp.status_code} carried no follower id"
         return follower["id"], follower.get("email") or email, None
@@ -170,7 +176,11 @@ def sync_project_followers(project_name):
 def sync_on_project_update(doc, method=None):
     """on_update hook. Must never prevent the Project from saving."""
     try:
-        sync_project_followers(doc.name)
+        if sync_project_followers(doc.name).get("processed"):
+            # Rows are written with db_set, which does not touch the in-memory doc.
+            # Without this the browser would render the pre-sync row state and the
+            # specialist would see "Pending" on a follower that actually registered.
+            doc.reload()
     except Exception:
         frappe.log_error(
             title=f"ShipsGo follower sync failed on save: {doc.name}",
