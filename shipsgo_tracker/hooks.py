@@ -134,7 +134,11 @@ doctype_js = {"Project": "public/js/project_override.js"}
 
 doc_events = {
 	"Project": {
-		"validate": "shipsgo_tracker.shipsgo_tracker.custom_function.project_doc_custom_function.validate_shipment_tracking"
+		"validate": [
+			"shipsgo_tracker.shipsgo_tracker.custom_function.project_doc_custom_function.validate_shipment_tracking",
+			"shipsgo_tracker.shipsgo_tracker.custom_function.project_followers.validate_follower_rows",
+		],
+		"on_update": "shipsgo_tracker.shipsgo_tracker.custom_function.project_followers.sync_on_project_update",
 	}
 	# 	"*": {
 	# 		"on_update": "method",
@@ -154,7 +158,11 @@ scheduler_events = {
 		# once daily at midnight (site timezone), after work hours
 		"0 0 * * *": [
 			"shipsgo_tracker.shipsgo_tracker.custom_function.shipment_refresh.refresh_active_shipments"
-		]
+		],
+		# catch up follower rows whose shipment was created after they were enabled
+		"30 0 * * *": [
+			"shipsgo_tracker.shipsgo_tracker.custom_function.project_followers.sync_all_project_followers"
+		],
 	},
 }
 
@@ -244,5 +252,8 @@ after_migrate = [
 # ignore_translatable_strings_from = []
 
 fixtures = [
-	{"doctype": "Custom Field", "filters": [["module", "=", "Shipsgo Tracker"], ["dt", "=", "Project"]]}
+	{
+		"doctype": "Custom Field",
+		"filters": [["module", "=", "Shipsgo Tracker"], ["dt", "in", ["Project", "Contact"]]],
+	}
 ]
