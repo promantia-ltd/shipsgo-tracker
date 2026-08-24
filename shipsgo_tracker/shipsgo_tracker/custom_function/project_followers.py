@@ -173,6 +173,31 @@ def sync_project_followers(project_name):
     return {"processed": len(pending)}
 
 
+def validate_follower_rows(doc, method=None):
+    """Block deleting a follower row that is still registered at ShipsGo.
+
+    Deleting the row destroys the follower id, and with it the only way to stop the
+    customer receiving ShipsGo emails. Unticking first performs the removal and
+    leaves the row safe to delete.
+    """
+    before = doc.get_doc_before_save()
+    if not before:
+        return
+
+    surviving = {row.name for row in (doc.get("custom_followers") or [])}
+    for old in before.get("custom_followers") or []:
+        if old.name in surviving:
+            continue
+        if old.status == "Active" and old.shipsgo_follower_id:
+            frappe.throw(
+                frappe._(
+                    "{0} is still receiving ShipsGo updates. Untick <b>Send Updates</b> "
+                    "and save to stop them, then delete the row."
+                ).format(frappe.bold(old.contact or frappe._("This contact"))),
+                title=frappe._("Follower still registered"),
+            )
+
+
 def sync_on_project_update(doc, method=None):
     """on_update hook. Must never prevent the Project from saving."""
     try:

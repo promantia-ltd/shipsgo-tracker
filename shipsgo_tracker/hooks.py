@@ -134,7 +134,10 @@ doctype_js = {"Project": "public/js/project_override.js"}
 
 doc_events = {
 	"Project": {
-		"validate": "shipsgo_tracker.shipsgo_tracker.custom_function.project_doc_custom_function.validate_shipment_tracking",
+		"validate": [
+			"shipsgo_tracker.shipsgo_tracker.custom_function.project_doc_custom_function.validate_shipment_tracking",
+			"shipsgo_tracker.shipsgo_tracker.custom_function.project_followers.validate_follower_rows",
+		],
 		"on_update": "shipsgo_tracker.shipsgo_tracker.custom_function.project_followers.sync_on_project_update",
 	}
 	# 	"*": {
