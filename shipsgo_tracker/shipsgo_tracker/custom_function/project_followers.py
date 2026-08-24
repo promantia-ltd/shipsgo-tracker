@@ -28,6 +28,10 @@ def default_contact_for_customer(customer):
     if not customer:
         return None
 
+    # Whitelisted: confirm the caller may read this Customer before returning one of
+    # its contacts.
+    frappe.has_permission("Customer", doc=customer, throw=True)
+
     linked = frappe.get_all(
         "Dynamic Link",
         filters={"link_doctype": "Customer", "link_name": customer, "parenttype": "Contact"},
@@ -37,7 +41,7 @@ def default_contact_for_customer(customer):
         return None
 
     shipping = frappe.get_all(
-        "Contact", filters={"name": ("in", linked), "is_shipping_contact": 1}, pluck="name"
+        "Contact", filters={"name": ("in", linked), "custom_is_shipping_contact": 1}, pluck="name"
     )
     if len(shipping) == 1:
         return shipping[0]

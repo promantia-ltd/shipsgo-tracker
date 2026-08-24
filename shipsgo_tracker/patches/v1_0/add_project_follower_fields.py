@@ -27,7 +27,7 @@ def execute():
             ],
             "Contact": [
                 {
-                    "fieldname": "is_shipping_contact",
+                    "fieldname": "custom_is_shipping_contact",
                     "fieldtype": "Check",
                     "label": "Is Shipping Contact",
                     "description": "Pre-selects this contact for shipment tracking updates.",

@@ -5,3 +5,4 @@
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 shipsgo_tracker.patches.v1_0.add_project_follower_fields
+shipsgo_tracker.patches.v1_0.rename_shipping_contact_flag
