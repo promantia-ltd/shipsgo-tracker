@@ -5,3 +5,8 @@
 tags
 node_modules
 __pycache__
+
+# Documentation and working artifacts — never committed by default.
+# To commit one deliberately: git add -f <path>
+docs/
+*.md

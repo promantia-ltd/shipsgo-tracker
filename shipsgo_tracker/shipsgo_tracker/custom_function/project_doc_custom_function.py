@@ -46,6 +46,27 @@ def validate_shipment_tracking(doc, method):
 			)
 
 
+def _register_pending_followers(docname):
+	"""Register any follower rows that were waiting for this shipment to exist.
+
+	`db_set` above does not fire `on_update`, so without this the rows would sit
+	Pending until the nightly catch-up. Imported lazily because project_followers
+	imports get_access_token from this module.
+	"""
+	try:
+		from shipsgo_tracker.shipsgo_tracker.custom_function.project_followers import (
+			sync_project_followers,
+		)
+
+		sync_project_followers(docname)
+	except Exception:
+		# Never let follower registration break shipment creation.
+		frappe.log_error(
+			title=f"ShipsGo followers: post-create sync failed for {docname}",
+			message=frappe.get_traceback(),
+		)
+
+
 @frappe.whitelist()
 def create_shipment(docname):
 	doc = frappe.get_doc("Project", docname)
@@ -88,6 +109,7 @@ def create_shipment(docname):
 			doc.db_set("custom_shipment_error", "")
 
 			doc.add_comment("Comment", f"Shipment created on ShipsGo. ID: {shipment_id}")
+			_register_pending_followers(docname)
 
 			return {"status": "success", "shipment_id": shipment_id}
 
@@ -100,6 +122,7 @@ def create_shipment(docname):
 			doc.db_set("custom_shipment_error", "")
 
 			doc.add_comment("Comment", f"Existing shipment linked (HTTP 409). ID: {shipment_id}")
+			_register_pending_followers(docname)
 
 			return {"status": "linked_existing", "shipment_id": shipment_id}
 
